@@ -6,6 +6,7 @@ def dump(file):
 	"""
 	Documentation...
 	"""
+    
 	try:
 		fd = open(file, "rb")
 	except:
@@ -18,9 +19,8 @@ def dump(file):
 	bytes = fd.read(16)
 	# while still bytes in the file
 	while bytes != b"":
+		print("%08x" % counter, end="  ")
 		counter += 16	
-		print("%06x" % counter, end="  ")
-		#len(bytes) add spaces....
 
 		# print hex values
 		i = 1 
@@ -34,9 +34,9 @@ def dump(file):
 				print(" ", end="")
 			i += 1
 
-		if len(bytes) < 16:
-			bytesleft = 16 - len(bytes)
-#			print (bytesleft * " ")
+		bytesleft = 16 - len(bytes)
+		if bytesleft > 0:
+			print (3*bytesleft * " ", end="")
 
 		# print ascii values
 		print(" |", end="")
@@ -48,8 +48,9 @@ def dump(file):
 				print(".", end="")
 		print("|")
 		bytes = fd.read(16)
-	counter += 16
-	print("%06x" % counter)
+
+	counter -= bytesleft
+	print("%08x" % counter)
 
 def usage():
 	print("Error:/n")

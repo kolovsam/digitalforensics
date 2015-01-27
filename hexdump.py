@@ -3,6 +3,9 @@
 import sys, string
 
 def dump(file):
+	"""
+	Documentation...
+	"""
 	try:
 		fd = open(file, "rb")
 	except:
@@ -11,15 +14,16 @@ def dump(file):
 	
 	# count how many bytes we have read in
 	counter = 0
-	# while still bytes in the file
+
 	bytes = fd.read(16)
+	# while still bytes in the file
 	while bytes != b"":
 		counter += 16	
 		print("%06x" % counter, end="  ")
 		#len(bytes) add spaces....
 
 		# print hex values
-		i = 0
+		i = 1 
 		for b in bytes:
 			if b:
 				if i == 8:
@@ -30,8 +34,12 @@ def dump(file):
 				print(" ", end="")
 			i += 1
 
+		if len(bytes) < 16:
+			bytesleft = 16 - len(bytes)
+#			print (bytesleft * " ")
+
 		# print ascii values
-		print("|", end="")
+		print(" |", end="")
 		for b in bytes:
 			char = ("%c" % b)
 			if b and char not in string.whitespace:
@@ -40,6 +48,8 @@ def dump(file):
 				print(".", end="")
 		print("|")
 		bytes = fd.read(16)
+	counter += 16
+	print("%06x" % counter)
 
 def usage():
 	print("Error:/n")

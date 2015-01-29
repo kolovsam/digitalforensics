@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3 
 
-import sys, string
+import sys 
 
 def dump(file):
 	"""
@@ -14,6 +14,7 @@ def dump(file):
 		i (int): counts how many hex values are printed for proper formatting
 		bytesleft (int): how many empty bytes in the last bytes array for proper formmatting
 		char (char): the printable character as read from the byte	
+		ascii (int): ascii value of char
 
 	Prints:
 		hexdump of the inputted file
@@ -22,6 +23,7 @@ def dump(file):
 	try:
 		fd = open(file, "rb")
 	except:
+		print("Error openning file.")
 		print("Error", sys.exc_info([0]))
 		sys.exit()
 	
@@ -48,7 +50,7 @@ def dump(file):
 				else:
 					print("%02x" % b, end=" ") # print hex val 2 digits wide
 			else:
-				print(" ", end="")
+				print("00", end=" ")
 			i += 1
 
 		bytesleft = 16 - len(bytes)		# calculate empty space for last line
@@ -64,7 +66,8 @@ def dump(file):
 		print(" |", end="")
 		for b in bytes:
 			char = ("%c" % b)	# print byte as ascii character
-			if b and char not in string.whitespace: # non-printable characters
+			ascii = ord(char)
+			if ascii > 32 and ascii < 128:
 				print(char, end="")
 			else:
 				print(".", end="")
@@ -73,6 +76,7 @@ def dump(file):
 
 	counter -= bytesleft	# accurately computer number of bytes read 
 	print("%08x" % counter) # print final byte count on its own line
+	fd.close()	# close file
 
 def usage():
 	print("Error:/n")

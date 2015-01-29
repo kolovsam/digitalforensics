@@ -1,9 +1,23 @@
 #!/usr/bin/env python3 
 
+"""
+Sam Kolovson
+CS365: Digital Forensics
+Professor Brian Levine
+Homework 1: Hexdump
+January 2015
+"""
+
 import sys 
 
 def dump(file):
 	"""
+	This module prints a hex dump of a file specified on the command line. The ouput
+	matches that of the output of '/user/bin/hexdump -vC filename' on the edlab. Each
+	line has three columns: (1) the	number of bytes since the start of the file (as
+	hexidecimal values), (2) the hex values for each byte of the file, (3) the ASCII
+	character of each byte (if printable) and '.' otherwise.
+
 	Args:
 		file (file): file to be read in
 
@@ -17,7 +31,12 @@ def dump(file):
 		ascii (int): ascii value of char
 
 	Prints:
-		hexdump of the inputted file
+		hexdump of the inputted file as specified above
+
+	Note:
+		pylint does not like the 'end=" "' in the print statements. This prevents python
+		from creating a new line at each print statement...Yes I could have done each
+		line as a string and kept adding to it, but I think print looks neater.
 	"""
     
 	try:
@@ -79,6 +98,10 @@ def dump(file):
 	fd.close()	# close file
 
 def usage():
+	"""
+	Example:
+		/usr/bin/python3.2 hexdump.py photo.jpg
+	"""
 	print("Error:/n")
 	print("USAGE: hexdump.py filename")
 

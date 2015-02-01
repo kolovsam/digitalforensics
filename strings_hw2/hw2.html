@@ -1,0 +1,119 @@
+
+
+
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html>
+	<head>
+	  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+   	<meta name="viewport" content="width=device-width,initial-scale = 1.0,maximum-scale = 1.0,user-scalable=no" />
+    <script type="text/javascript" src="/idp/res/js/jquery-1.8.0.min.js"></script>
+    <script type="text/javascript" src="/idp/res/js/prefixfree.min.js"></script>
+    <script type="text/javascript" src="/idp/res/js/modernizr.custom.js"></script>
+    <script type="text/javascript" src="/idp/res/js/weblogin.js"></script>
+    <link rel="stylesheet"  type="text/css" href="/idp/res/League-Gothic/league-gothic.css"/>
+    <link rel="stylesheet"  type="text/css" href="/idp/res/weblogin.css"/>
+    <link rel="stylesheet"  type="text/css" media="(min-width: 899px)"  href="/idp/res/oit.css"/>
+    <link rel="stylesheet"  type="text/css" href="/idp/res/animate-custom.css"/>
+    <link rel="stylesheet" type="text/css" media="(max-width: 899px), only screen and (min-width: 640px) and (max-width: 1136px) and (min-device-pixel-ratio: 1.5)" href="/idp/res/mobile.css"/>
+    <link rel="stylesheet" type="text/css" media="(max-width: 899px), only screen and (min-width: 640px) and (max-width: 1136px) and (min-device-pixel-ratio: 1.5)" href="/idp/res/mobile_oit.css"/>
+		<!--[if IE 8]>
+    <link rel="stylesheet"  type="text/css" href="/idp/res/oit.css"/>
+	 <style>
+	   .body_wrapper {background:none; }    
+	 </style> 
+	 <![endif]-->
+    <!--[if lte IE 7]>
+    <link rel="stylesheet"  type="text/css" href="/idp/res/mobile_oit.css"/>
+	 <style>
+        .center_container {
+            width: 320px;
+            margin-left: -160px;
+            margin-top: -210px;
+            left: 50%;
+        }
+	   .body_wrapper {background:none; }    
+	 </style> 
+	 <![endif]-->
+   	<!-- https://moodle.umass.edu/shibboleth -->
+    <title>moodle.umass.edu - Web Login - OIT - UMass Amherst</title>
+	</head>
+	<body>
+	   <div class="body_wrapper animated_1s fadeIn" >
+      <div id='logo_container_outside'>
+      	<a class="umass_logo" href="http://www.umass.edu">UMass Amherst</a>
+      </div>
+     	
+	     <div class="center_container">
+  	     <div id='logo_container'>
+           <a class="umass_logo" href="http://www.umass.edu">UMass Amherst</a>
+          </div>
+         <div class="login_panel" >
+    	     <div class="header">
+           
+             <div class="empty_icon"></div>
+					 
+            
+           	<h3>Web Login</h3>
+            <h1> moodle.umass.edu </h1>
+	         </div>
+	       <div class="content" >  
+      
+					
+  
+          
+              <form id="query" action="/idp/Authn/UserPassword" method="post">
+          
+				 	<div class="input_wrapper"><input type="text" name='j_username' id='netid_text' placeholder="NetID" tabindex="1"/></div>
+
+    	    <div class="input_wrapper"><input type="password" name="j_password" id='password_text' placeholder="Password" tabindex="2" /><input type="submit" tabindex="3" value="" name="Submit" id='login_submit'/></div>
+        		</form>
+            
+           
+						<p>Once you log in, you have access to this and other services that use <strong>Web Login</strong>.</p>
+					
+           
+            
+          <p class="bottom_text_gapps"><a href="https://www.oit.umass.edu/support/accounts/understand-your-netid-password">About your NetID & Password</a>
+            <a href="http://www.oit.umass.edu/support/accounts/understand-your-netid-password#Your%20OIT%20Account%20Password">Forgot your password?</a>
+            
+          </p>
+            
+            	<form action="https://moodle.umass.edu/login/index.php" method="post" id="guestlogin">
+                <div class="guestform">
+                  <input type="hidden" name="username" value="guest"/>
+                  <input type="hidden" name="password" value="guest"/>
+                  <hr />
+                  <input type="submit" value="Moodle Guest Access"/>
+                </div>
+              </form>
+            
+            
+    	    </div>
+				</div>
+    	   <div class="aside">
+				  <div class="ad">
+          	<a href="https://go.umass.edu">
+  <img src="https://www.it.umass.edu/gapps_res/go.png" alt="Go UMass" />  
+</a>
+				  </div>	
+				 
+                  
+                  <div class="news">
+				    <h2>IT News</h2><p><a target="_top" href='https://www.it.umass.edu/news/umail-intermittently-unavailable-thurs-129-6-7-am'><strong>UMail Intermittently Unavailable Thurs., 1/29, 6 - 7 a.m.</strong></a></p><div class="date"><p>January 28, 2015</p></div><p><a target="_top" href='https://www.it.umass.edu/news/udrive-unavailable-630-730-am-thurs-129'><strong>UDrive Unavailable from 6:30 to 7:30 a.m. - Thurs., 1/29</strong></a></p><div class="date"><p>January 28, 2015</p></div><p><a target="_top" href='https://www.it.umass.edu/news/open-forum-information-technology-policies-wed-128-1-pm'><strong>Open Forum on Information Technology Policies, Wed., 1/28, 1 p.m.</strong></a></p><div class="date"><p>January 26, 2015</p></div>
+
+            
+            <a href="http://www.oit.umass.edu/news">More...</a>
+				  </div>
+				</div> 
+        <p class="bottom_text"><a href="https://www.oit.umass.edu/support/accounts/understand-your-netid-password">About your NetID & Password</a>  |   <a href="http://www.oit.umass.edu/support/accounts/understand-your-netid-password#Your%20OIT%20Account%20Password">Forgot your password?</a></p>
+	     </div>
+       
+     <div id="footer">
+       <p>This site is maintained by the <a href="http:/www.oit.umass.edu">UMass Amherst Information Technology</a>.<br/>
+       Copyright &copy; <script>document.write((new Date()).getFullYear()) </script> University of Massachusetts Amherst. <a href="http://umass.edu/umhome/policies.html">Site Policies</a>.</p>
+   </div>
+	</body>
+</html>

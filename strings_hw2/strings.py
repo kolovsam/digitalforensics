@@ -4,8 +4,8 @@
 Sam Kolovson
 CS365: Digital Forensics
 Professor Brian Levine
-Homework 1: Hexdump
-January 2015
+Homework 2: Strings
+February 2015
 """
 
 import sys
@@ -110,4 +110,3 @@ def main():
 # Standard boilerplate to run main()
 if __name__ == '__main__':
 	main()
-	

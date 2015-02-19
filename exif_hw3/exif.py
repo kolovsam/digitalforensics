@@ -20,7 +20,7 @@ class Exif(object):
         self._filename = filename
         self._fd = None
         self._markers = []
-        self._sizes = []
+        #self._sizes = []
         self._4d = 0
         self._num_entries = 0
         self._entries_start = 0
@@ -88,7 +88,7 @@ class Exif(object):
 
             # unpack size as a short
             size = unpack(">H", size)[0]
-            self._sizes.append(size)
+            #self._sizes.append(size)
 
             # seek to next marker
             self._fd.seek(size-2, 1)
@@ -137,10 +137,8 @@ class Exif(object):
         # after confirming big endian, fd.tell points to the idf_offset
         ifd_offset = unpack(">L", self._fd.read(4))[0]
 
-
         # seek to the start of the IFD
         self._fd.seek(ifd_offset-8, 1)
-
 
         # get number of entries
         self._num_entries = unpack(">H", self._fd.read(2))[0]
@@ -148,7 +146,6 @@ class Exif(object):
 
         # set start of entries
         self._entries_start = self._fd.tell()
-        #print (self._entries_start)
 
 
     def print_entries(self):
@@ -164,7 +161,10 @@ class Exif(object):
             self._fd.seek(i*12, 1)
             
             # tag (2 bytes)
-            tag = TAGS[unpack(">H", self._fd.read(2))[0]]
+            tag = self._fd.read(2)
+            tag_str = TAGS[unpack(">H", tag)[0]]
+            print (''.join('{:X}'.format(b) for b in tag), end=" ")
+            print ("%s:" % tag_str, end="  ")
             
             # format (2 bytes)
             form = unpack(">H", self._fd.read(2))[0]
@@ -178,13 +178,19 @@ class Exif(object):
             # data (4 bytes)
             data = self._fd.read(4)
 
+            # data field is the value...
             if length <= 4:
                 self.print_value(form, components, length, data)
+
+            # data field is the offset...
             else:
+                # seek to location of 0x4d + offset
                 self._fd.seek(self._4d+unpack(">L", data)[0])
                 self.print_value(form, components, length, self._fd.read(length))
 
+            # reset file pointer to the start of IFD entries
             self._fd.seek(self._entries_start)
+
 
     def print_value(self, form, components, length, data):
         """
@@ -209,7 +215,7 @@ class Exif(object):
         # Unsigned rational
         elif form == 5:
             (numerator, denominator) = unpack(">LL", data[0:8])
-            print ("%s/%s" % (numerator, denominator))
+            print ("['%s/%s']" % (numerator, denominator))
 
         # Undefined (raw)
         elif form == 7:

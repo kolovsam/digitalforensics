@@ -4,8 +4,8 @@
 Sam Kolovson
 CS365: Digital Forensics
 Professor Brian Levine
-Homework 3: EXIF
-February 2015
+Homework 4: FAT
+March 2015
 """
 
 import sys

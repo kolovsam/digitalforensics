@@ -5,7 +5,7 @@ Sam Kolovson
 CS365: Digital Forensics
 Professor Brian Levine
 Homework 5: NTFS
-March 2015
+April 2015
 """
 
 import sys
@@ -14,24 +14,59 @@ import datetime
 
 class NTFS(object):
     """
+    Parses the $MFT and an arbitrary MFT entry of an NTFS image
+
+    Variables:
+        _dmg (string): name of the image to be parsed
+        _fd (file): the image being parsed
+        _entry_num (int): the MFT entry to be parsed other than the $MFT_entry
+        _mft0 (MFT_entry): the first entry in the MFT
+        _bytes_per_sector (int): the number of bytes per sector 
+        _sectors_per_cluster (int): the number of sectors per cluster
+        _mft_start (int): the starting byte of the MFT
+        _mft (bytes): the first entry of the MFT
+
+    Functions:
+        run()
+        parse_boot_sector()
+        parse_mft()
+        parse_entry()
+        open_image()
     """
 
-    def __init__(self, dmg):
+    def __init__(self, entry, dmg):
         self._dmg = dmg
         self._fd = None
 
-    def run(self):
-        self.open_image()
-        self.find_MFT()
-        self.read_in_mft()
-        self.mft_head = MFT_entry(self._mft)
-        self.mft_head.run()
-        self.find_entry()
+        try:
+            self._entry_num = int(entry)
+        except:
+            print("Please input number not letter...")
+            print("Error:", sys.exc_info()[0])
 
-    def find_MFT(self):
+        self._bytes_per_sector = 0
+        self._sectors_per_cluster = 0
+        self._mft_start = 0
+        self._mft = None
+
+    def run(self):
+        """
+        Runs all necessary functions to parse the $MFT and the arbitrary
+        entry in the MFT.
+        """
+        self.open_image()
+        self.parse_boot_sector()
+        self.parse_mft()
+        self.parse_entry()
+
+    def parse_boot_sector(self):
         """
         Finds the starting cluster address of the MFT.
+
+        Prints:
+            The important values found or calculateed from the boot sector
         """
+        print ("---- PARSING BOOT SECTOR ----")
 
         # get the number of bytes per sector from the boot sector
         self._fd.seek(11)
@@ -45,34 +80,61 @@ class NTFS(object):
         # get the start of the $MFT 
         self._fd.seek(48)
         self._mft_start = unpack("<2L", self._fd.read(8))[0]
-        self._mft_start = self._mft_start * self._bytes_per_sector * self._sectors_per_cluster
+        print ("MFT Cluster Start: %d" % self._mft_start)
+        self._mft_start *= self._bytes_per_sector * self._sectors_per_cluster
+        print ("MFT Byte Start: %d" % self._mft_start)
 
-        print ("MFT Start: %d" % self._mft_start)
+        # get total sectors
+        self._fd.seek(40)
+        self._total_sectors = unpack("<2L", self._fd.read(8))[0]
+        print ("Total Sectors: %d" % self._total_sectors)
+   
         print ("")
 
-    def read_in_mft(self):
+    def parse_mft(self):
         """
-        """
+        Parses the first entry in the MFT.
 
+        Prints:
+            Output for the first entry of the MFT
+        """
+        print ("---- PARSING MFT ENTRY 0 ----")
         self._fd.seek(self._mft_start)
         self._mft = self._fd.read(1024)
 
-    def find_entry(self):
-        entry = 32
-        print (len(self.mft_head._runlist))
-        constant = len(self.mft_head._runlist)//1024
-        print (constant)
-        entry = entry // constant
-        print(entry)
-        entry_start = self.mft_head._runlist[entry]
-        print (entry_start)
-        entry_start = entry_start * self._bytes_per_sector * self._sectors_per_cluster
-        print (entry_start)
-        self._fd.seek(entry_start)
-        mft = self._fd.read(1024)
-        print (bytes.decode(mft[0:8]))
-        entry = MFT_entry(mft)
-        #entry.run()
+        self._mft0 = MFT_entry(self._mft)
+        self._mft0.run()
+
+    def parse_entry(self):
+        """
+        Locates the given entry in the MFT on disk and parses it the same way
+        as entry 0.
+
+        Attributes:
+            entries_per_cluster (int):
+            entry_start (int): the starting cluster of the given entry and the
+                and the starting byte of the given entry
+            entry (MFT_entry): the MFT entry that is parsed
+
+        Prints:
+            Output for the given entry
+        """
+        print ("---- PARSING ENTRY %d ----" % self._entry_num)
+        entries_per_cluster = self._sectors_per_cluster * self._bytes_per_sector / 1024
+
+        try:
+            # get starting cluster
+            entry_start = self._mft0._runlist[(int)(self._entry_num / entries_per_cluster)]
+            # get starting byte
+            entry_start *= self._bytes_per_sector * self._sectors_per_cluster
+
+            self._fd.seek(entry_start)
+            entry = MFT_entry(self._fd.read(1024))
+            entry.run()
+        except:
+            print ("The file system does not contain the selected entry...")
+            print ("Error:", sys.exc_info()[0])
+
 
     def open_image(self):
         """ Opens dmg, and calls usage() on error """
@@ -89,40 +151,67 @@ class NTFS(object):
 class MFT_entry(object):
     """
     Parses an MFT entry.
+
+    Variables:
+        _entry (bytes): the entry being parsed
+        _first_attr (int): offset to the first attribute
+        _used_size (int): bytes filled in the entry
+        _next_attrID (int): the value would be assigned to a new attribute
+        _runlist (ints): clusters in the runlist
+
+    Functions:
+        run()
+        parse_header()
+        fix_up()
+        parse_attributes()
+        parse_attr_header()
+        parse_resident_attr()
+        parse_nonresident_attr()
+        parse_runlist()
     """
 
-    def __init__(self, mft):
-        #self._fd = fd
-        self._mft = mft
+    def __init__(self, entry):
+        self._entry = entry
         self._first_attr = 0
         self._used_size = 0
         self._next_attrID = 0
         self._runlist = []
 
     def run(self):
-        self.istat()
+        """
+        Runs the necessary functions to parse the entry.
+        """
+        self.parse_header()
         self.fix_up()
         self.parse_attributes()
 
-    def istat(self):
+    def parse_header(self):
+        """
+        Parses the header values of the MFT entry.
+
+        Attributes:
+            seq (int): sequence value of the entry
+            lsn (int): logfile sequence number of the entry
+            allocated_size (int): allocated size of the entry
+        """
 
         # get the sequence value of the entry
-        seq = unpack("<B", self._mft[16:17])[0]
+        seq = unpack("<B", self._entry[16:17])[0]
 
         # get the logfile sequence number (lsn) of the entry
-        lsn = unpack("<2L", self._mft[8:16])[0]
+        lsn = unpack("<2L", self._entry[8:16])[0]
 
         # get used size of the entry
-        self._used_size = unpack("<L", self._mft[24:28])[0]
+        self._used_size = unpack("<L", self._entry[24:28])[0]
 
         # get allocated size of the entry
-        allocated_size = unpack("<L", self._mft[28:32])[0]
+        allocated_size = unpack("<L", self._entry[28:32])[0]
 
         # get offset to first attribute
-        self._first_attr = unpack("<H", self._mft[20:22])[0]
+        self._first_attr = unpack("<H", self._entry[20:22])[0]
 
         # get next attribute id
-        self._next_attrID = unpack("<H", self._mft[40:42])[0]
+        self._next_attrID = unpack("<H", self._entry[40:42])[0]
 
         print ("MFT Entry Header Values:")
         print ("Sequence: %d" % seq)
@@ -136,118 +225,102 @@ class MFT_entry(object):
 
     def fix_up(self):
         """
-        Handle the fix up array
+        Handle the fix up array. Finds the fixup array, the number of entries
+        and the signature. Then swaps the last two values of each sector
+        with the corresponding value from the fixup array.
+
+        Attributes:
+            offset (int): the offset to the fixup array
+            num (int): the number of entries in the fixup array
+            signature (hex): the fixup signature
+            fixup_array (bytes): the byte values of the fixup array
+            string (string): the string of fixup array values to print
+            temp_entry (bytes): the temporary array to enable overwriting the fixup values
+            current_offset (int): the offset to the next bytes to swap with the fixup array
+            sector_offset (int): offset to the bytes in the sector where the fixup value is going
         """
 
         # get the offset to the fix up array
-        offset = unpack("<H", self._mft[4:6])[0]
+        offset = unpack("<H", self._entry[4:6])[0]
         print ("Offset to fix up array: %d" % offset)
 
         # get the number of entries in the fix up array
-        num = unpack("<H", self._mft[6:8])[0]
+        num = unpack("<H", self._entry[6:8])[0]
         print ("Number of entries in the fix up array: %d" % num)
 
-        signature = ''.join('{:02x}'.format(b) for b in reversed(self._mft[offset:offset+2]))
+        signature = ''.join('{:02x}'.format(b) for b in reversed(self._entry[offset:offset+2]))
         print ("Fixup sig: 0x" + signature)
 
         fixup_array = []
-        string = ""
         for i in range (0, num-1):
-            fixup_array.append(self._mft[offset+2+i*2: offset+4+i*2])
-            string += "0x" + ''.join('{:02x}'.format(b) for b in reversed(fixup_array[i])) + ", "
+            fixup_array.append(self._entry[offset+2+i*2: offset+4+i*2])
+            #string += "0x" + ''.join('{:02x}'.format(b) for b in reversed(fixup_array[i])) + ", "
 
-        print("Fixup array: [%s]" % string)
-
-        temp_mft = []
+        temp_entry = []
         current_offset = 0
-        print (self._mft[510:512])
-        print (self._mft[1022:1024])
         for i in range (0, num-1):
             sector_offset = 510*(i+1) + i*2
-            bytes = "0x" + ''.join('{:02x}'.format(b) for b in reversed(self._mft[sector_offset:sector_offset+2]))
-            print ("Bytes %d/%d %s" % (sector_offset, sector_offset+1, bytes))
+            bytes = "0x" + ''.join('{:02x}'.format(b) for b in 
+                reversed(self._entry[sector_offset:sector_offset+2]))
+            print ("Bytes %d/%d %s;" % (sector_offset, sector_offset+1, bytes), end=" ")
 
             # over write
-            print ("Overwriting %s into bytes %d/%d" % 
-                (fixup_array[i], sector_offset, sector_offset+1))
-            temp_mft.extend(self._mft[current_offset:sector_offset])
-            temp_mft.extend(fixup_array[i])
-            fixup_array[i] = self._mft[sector_offset:sector_offset+2]
+            print ("Overwriting 0x%s into bytes %d/%d" % 
+                (''.join('{:02x}'.format(b) for b in reversed(fixup_array[i])), 
+                    sector_offset, sector_offset+1))
+            temp_entry.extend(self._entry[current_offset:sector_offset])
+            temp_entry.extend(fixup_array[i])
+            fixup_array[i] = self._entry[sector_offset:sector_offset+2]
             current_offset = sector_offset+2
 
-        print (fixup_array)
-
-        temp_mft = bytearray(temp_mft)
-        print (temp_mft[510:512])
-        print (temp_mft[1022:1024])
-        print (temp_mft)
-        self._mft = temp_mft
+        temp_entry = bytearray(temp_entry)
+        self._entry = temp_entry
 
         print ("")
 
     def parse_attributes(self):
         """
+        Parses all attributes in the entry.
+
+        Attributes:
+            byte_offset (int): the offset of the next attribute
+            attr_count (int): the number of attributes parsed
+            attr_size (int): the size in bytes of the attribute
+            attr (bytes): the attribute in memory
+            standard_info (STD_INFO): the $STD_INFO attribute
+            file_name (FILE_NAME): the $FILE_NAME attribute
+            nr_flag (int): zero if attribute is resident, 1 if non-resident
         """
         #print ("Next attr id %d" % self._next_attrID)
         byte_offset = self._first_attr
-        used_size = self._used_size - 56
         attr_count = 0
-        while (byte_offset < used_size and attr_count < self._next_attrID):
+        while (byte_offset+16 < self._used_size and attr_count < self._next_attrID):
+            print ("Parsing next attribute: ((byte_offset=(%d+16) < used_size=%d) and (attr_count=%d < next_attribute=%d)"
+                % (byte_offset, self._used_size, attr_count, self._next_attrID))
+
             # read in first/next attribute
-            attr_size = unpack("<L", self._mft[byte_offset+4:byte_offset+8])[0]
-            attr = self._mft[byte_offset:byte_offset+attr_size]
+            attr_size = unpack("<L", self._entry[byte_offset+4:byte_offset+8])[0]
+            attr = self._entry[byte_offset:byte_offset+attr_size]
 
-            # parse attribute header
-            # get attribute type identifier 0-3
-            attr_type = unpack("<L", attr[0:4])[0]
-            # get non-resident flag 8-8
-            nr_flag = unpack("<B", attr[8:9])[0]
-            if nr_flag == 0: resident = "Resident"
-            else: resident = "Non-resident" 
-            # get length of name 9-9
-            name_length = unpack("<B", attr[9:10])[0]
-            # get offset to name 10-11
-            name_offset = unpack("<H", attr[10:12])[0]
-            # get flags 12-13
-            flags = unpack("<H", attr[12:14])[0]
-            # get attribute identifier 14-15
-            attr_id = unpack("<H", attr[14:16])[0]
-
-            # print attribute header
-            print ("Type: %d, %s, size: %d, " % (attr_type, resident, attr_size), end="")
-            print ("NameLen: %d, NameOff: %d, " % (name_length, name_offset), end="")
-            print ("Flags: %d, Attribute id: %d" % (flags, attr_id))
-
-            # if type is 16, parse std_info
-            if attr_type == 16:
-                standard_info = STD_INFO(attr)
-                standard_info.parse()
-
-            # if type is 48, parse file_name
-            elif attr_type == 48:
-                file_name = FILE_NAME(attr)
-                file_name.parse()
-
+            attr_type, nr_flag = self.parse_attr_header(attr, attr_size)
 
             # if it is a resident attribute
-            elif nr_flag == 0:
-                # get size of content
-                content_size = unpack("<L", attr[16:20])[0]
-                print ("\tcontent size \t %d" % content_size)
-                # get offset to content
-                content_offset = unpack("<H", attr[20:22])[0]
-                print ("\tcontent offset \t %d" % content_offset)
+            if nr_flag == 0:
+                content_size, content_offset = self.parse_resident_attr(attr)
+
+                # if type is 16, parse std_info
+                if attr_type == 16:
+                    standard_info = STD_INFO(attr, content_size, content_offset)
+                    standard_info.parse()
+
+                # if type is 48, parse file_name
+                elif attr_type == 48:
+                    file_name = FILE_NAME(attr, content_size, content_offset)
+                    file_name.parse()
 
             # if it is a non-resident attribute
             elif nr_flag == 1:
-                start_vcn = unpack("<2L", attr[16:24])[0]
-                end_vcn = unpack("<2L", attr[24:32])[0]
-                print ("VCN: %d - %d" % (start_vcn, end_vcn))
-
-                # get offset to runlist 32-33
-                offset_to_rl = unpack("<H", attr[32:34])[0]
-                print ("Start of RL = %d" % offset_to_rl)
-                self.parse_runlist(attr, attr_type, offset_to_rl)
+                self.parse_nonresident_attr(attr, attr_type)
 
             # set up for next attribute
             byte_offset += attr_size
@@ -255,8 +328,110 @@ class MFT_entry(object):
             print ("")
             # end while loop
 
+    def parse_attr_header(self, attr, attr_size):
+        """
+        Parses attribute's header.
+
+        Attributes:
+            attr_type (int): the identifier for certain attribute types
+            nr_flag (int): non-resident flag - 0 if the attribute is resident, 1 if non-resident
+            resident (string): "resident" if attr. is resident, "non-resident" otherwise
+            name_length (int): length of name
+            name_offset (int): offset to name
+            flags (int): attribute flags, compressed, encrypted, or sparse
+            attr_id (int): unique number to this attr. for this MFT entry
+
+        Prints:
+            Important values in the attribute headers
+
+        Returns:
+            Attribute type and non-resident flag 
+        """
+        # get attribute type identifier 0-3
+        attr_type = unpack("<L", attr[0:4])[0]
+        # get non-resident flag 8-8
+        nr_flag = unpack("<B", attr[8:9])[0]
+        if nr_flag == 0: resident = "Resident"
+        else: resident = "Non-resident" 
+        # get length of name 9-9
+        name_length = unpack("<B", attr[9:10])[0]
+        # get offset to name 10-11
+        name_offset = unpack("<H", attr[10:12])[0]
+        # get flags 12-13
+        flags = unpack("<H", attr[12:14])[0]
+        # get attribute identifier 14-15
+        attr_id = unpack("<H", attr[14:16])[0]
+
+        # print attribute header
+        print ("Type: %d, %s, size: %d, " % (attr_type, resident, attr_size), end="")
+        print ("NameLen: %d, NameOff: %d, " % (name_length, name_offset), end="")
+        print ("Flags: %d, Attribute id: %d" % (flags, attr_id))
+
+        return attr_type, nr_flag
+
+    def parse_resident_attr(self, attr):
+        """
+        Parses resident attributes.
+
+        Attributes:
+            content_size (int): size of the attribute content
+            content_offset (int): offset to the attribute content
+
+        Returns:
+            Content size and offset
+        """
+
+        # get offset to content
+        content_offset = unpack("<H", attr[20:22])[0]
+        print ("\tOffset to content:  %d" % content_offset, end=" ")
+
+        # get size of content
+        content_size = unpack("<L", attr[16:20])[0]
+        print ("\tSize of content:  %d" % content_size)
+
+        return content_size, content_offset
+
+    def parse_nonresident_attr(self, attr, attr_type):
+        """
+        Parses non-resident attributes.
+
+        Attributes:
+            start_vcn (int): starting virtual cluster number
+            end_vcn (int): ending virtual cluster number
+            offset_to_rl (int): offset to runlist
+        """
+        start_vcn = unpack("<2L", attr[16:24])[0]
+        end_vcn = unpack("<2L", attr[24:32])[0]
+        print ("VCN: %d - %d" % (start_vcn, end_vcn))
+
+        # get offset to runlist 32-33
+        offset_to_rl = unpack("<H", attr[32:34])[0]
+        print ("Start of RL = %d" % offset_to_rl)
+        self.parse_runlist(attr, attr_type, offset_to_rl)
+
+        if attr_type == 128:
+            print ("Parsing $DATA")
+            print ("Runlist:  %s" % self._runlist)
+
+
     def parse_runlist(self, attr, attr_type, offset):
         """
+        Parses the runlist of a non-resident attribute.
+
+        Attributes:
+            first_byte (byte): first byte of a runlist entry, determines how long the
+                the runlist field and offset field are
+            offset (int): current offset in the runlist
+            prev_rl_offset (int): previous offset runlist offset
+            offset_field (int): number of bytes in the offset field
+            rl_field (int): number of bytes in the runlist length field
+            rl_length (int): runlist length / number of clusters in the runlist
+            rl_offset (int): offset to starting cluster in the runlist
+            start_cluster (int): first cluster in the runlist
+            end_cluster (int): last cluster in the runlist
+
+        Prints:
+            Important runlist related values
         """
 
         first_byte = attr[offset:offset+1] # read first byte
@@ -287,9 +462,8 @@ class MFT_entry(object):
             start_cluster = prev_rl_offset + rl_offset
             end_cluster = start_cluster + rl_length-1
             print ("Clusters go from: %d - %d" % (start_cluster, end_cluster))
-            if attr_type == 128: 
-                self._runlist.extend(range(start_cluster, end_cluster))
-                #print (self._runlist)
+            if attr_type == 128:
+                self._runlist.extend(range(start_cluster, end_cluster+1))
 
             # set up for next item in the runlist
             prev_rl_offset = rl_offset
@@ -301,26 +475,43 @@ class MFT_entry(object):
 class STD_INFO(object):
     """
     Parses the $STD_INFO attribute of the $MFT.
+
+    Variables:
+        _attr (bytes): the attribute being parsed
+        _content_size (int): the size of the attribute content
+        _content_offset (int): the offset to the attribute content
+        _content (bytes): the content being parsed
+        _file_creation (datetime): when the file was created
+        _file_altered (datetime): when the file was last altered
+        _mft_altered (datetime): when the mft was last altered
+        _file_accessed (datetime): when the file was last accessed
+        _flags (int/string): flag value and flag strings
+        _num_versions (int): maximum number of versions
+        _class_id (int): class ID
+        _owner_id (int): owner ID
+        _security_id (int): security ID
+        _quota (int): quota charged
+        _usn (int): update sequence number
+
+    Functions:
+        parse()
+        print_fields()
     """
 
-    def __init__(self, attribute):
+    def __init__(self, attribute, content_size, content_offset):
         self._attr = attribute
-
+        self._content_size = content_size
+        self._content_offset = content_offset
 
     def parse(self):
-        print ("Parsing STANDARD_INFO")
-
-        # get size of content 16-19
-        self._content_size = unpack("<L", self._attr[16:20])[0]
-        # get offset to content 20-21
-        self._content_offset = unpack("<H", self._attr[20:22])[0]
+        print ("\tParsing $STANDARD_INFO")
 
         # read in content
         self._content = self._attr[self._content_offset:self._content_size
             +self._content_offset]
 
         # get creation time 0-7
-        self._creation = convert_time(self._content[0:8])
+        self._file_creation = convert_time(self._content[0:8])
         # get file altered time 8-15
         self._file_altered = convert_time(self._content[8:16])
         # get MFT altered time 16-23
@@ -329,6 +520,7 @@ class STD_INFO(object):
         self._file_accessed = convert_time(self._content[24:32])
         # get flags 32-35
         self._flags = unpack("<L", self._content[32:36])[0]
+        self._flags = check_flags(self._flags)
         # get maximum number of versions 36-39
         self._num_versions = unpack("<L", self._content[36:40])[0]
         # get version number 40-43
@@ -347,35 +539,56 @@ class STD_INFO(object):
         self.print_fields()
 
     def print_fields(self):
-        print ("\t creation time \t %s" % self._creation)
-        print ("\t  file altered \t %s" % self._file_altered)
-        print ("\t   mft altered \t %s" % self._mft_altered)
         print ("\t file accessed \t %s" % self._file_accessed)
+        print ("\t      Owner ID \t %s" % self._owner_id)
+        print ("\tversion number \t %s" % self._version)
+        print ("\t creation time \t %s" % self._file_creation)
+        print ("\t   Security ID \t %s" % self._security_id)
+        print ("\t   mft altered \t %s" % self._mft_altered)
+        print ("\t  Update seq # \t %s" % self._usn)
         print ("\t         flags \t %s" % self._flags)
         print ("\tmax # versions \t %s" % self._num_versions)
-        print ("\tversion number \t %s" % self._version)
         print ("\t      Class ID \t %s" % self._class_id)
-        print ("\t      Owner ID \t %s" % self._owner_id)
-        print ("\t   Security ID \t %s" % self._security_id)
         print ("\t Quota Charged \t %s" % self._quota)
-        print ("\t  Update seq # \t %s" % self._usn)
+        print ("\t  file altered \t %s" % self._file_altered)
 
 
 class FILE_NAME(object):
     """
     Parses the $FILE_NAME attribute in the $MFT.
+
+    Variables:
+        _attr (bytes): the attribute being parsed
+        _content_size (int): size of the attribute content
+        _content_offset (int): offset to the attribute content
+        _content (bytes): the content being parsed
+        _parent_dir (int): file reference of the parent directory
+        _file_creation (datetime): when the file was created
+        _file_modification (datetime): when the file was last modified 
+        _file_access (datetime): when the file was last accessed
+        _alloc_size (int): the allocated size of the file
+        _real_size (int): the real size of the file
+        _flags (int/string): flag value and flag strings
+        _reparse (int): reparse value
+        _name_length (int): length of name
+        _namespace (int): namespace value
+        _name (string): file name
+
+    Functions:
+        parse()
+        print_fields()
     """
 
-    def __init__(self, attribute):
+    def __init__(self, attribute, content_size, content_offset):
         self._attr = attribute
+        self._content_size = content_size
+        self._content_offset = content_offset
 
     def parse(self):
-        print ("Parsing FILE_NAME")
-
-        # get size of content 16-19
-        self._content_size = unpack("<L", self._attr[16:20])[0]
-        # get offset to content 20-21
-        self._content_offset = unpack("<H", self._attr[20:22])[0]
+        """
+        Parses the $FILE_NAME attribute.
+        """
+        print ("\tParsing $FILE_NAME")
 
         # read in content
         self._content = self._attr[self._content_offset:self._content_size
@@ -397,6 +610,7 @@ class FILE_NAME(object):
         self._real_size = unpack("<2L", self._content[48:56])[0]
         # get flags 56-59
         self._flags = unpack("<L", self._content[56:60])[0]
+        self._flags = check_flags(self._flags)
         # get reparse value 60-63
         self._reparse = unpack("<L", self._content[60:64])[0]
         # get length of name 64-64
@@ -404,26 +618,38 @@ class FILE_NAME(object):
         # get namespace 65-65
         self._namespace = unpack("<B", self._content[65:66])[0]
         # get name 66+
-        #self._name = unpack("<")
+        self._name = self._content[66:].decode("utf-8")
 
         self.print_fields()
 
     def print_fields(self):
-        print ("\t  content Size \t %d" % self._content_size)
-        print ("\t    Parent dir \t %d" % self._parent_dir)
-        print ("    file creation time \t %s" % self._file_creation)
-        print ("\t file mod time \t %s" % self._file_modification)
-        print ("\t  MFT mod time \t %s" % self._mft_modification)
-        print ("      file access time \t %s" % self._file_access)
         print ("   Alloc. size of file \t %d" % self._alloc_size)
-        print ("\t Real filesize \t %d" % self._real_size)
-        print ("\t         flags \t %d" % self._flags)
-        print ("\t Reparse value \t %d" % self._reparse)
-        print ("\t       NameLen \t %d" % self._name_length)
+        print ("\tLength of name\t %d" % self._name_length)
+        print ("\t  MFT mod time \t %s" % self._mft_modification)
+        print ("\t          Name \t %s" % self._name)
         print ("\t     Namespace \t %d" % self._namespace)
+        print ("\t    Parent dir \t %d" % self._parent_dir)
+        print ("\t Real filesize \t %d" % self._real_size)
+        print ("\t Reparse value \t %d" % self._reparse)
+        print ("      file access time \t %s" % self._file_access)
+        print ("    file creation time \t %s" % self._file_creation)  
+        print ("\t file mod time \t %s" % self._file_modification)
+        print ("\t         flags \t %s" % self._flags)
 
+
+# functions needed by all classes                
 
 def convert_time(time):
+    """
+    Converts windows time to datetime.
+
+    Attributes:
+        D (int): a constant for the conversion
+        epoch (int): time in epoch time
+
+    Returns:
+        epoch as a datetime string
+    """
     D = 116444736000000000
     time = getSigned(time)
     epoch = (time - D)/10000000
@@ -442,6 +668,14 @@ def getSigned(bytes):
     "\x00*2
 
     Assume little endian
+
+    Attributes:
+        length (int): length of bytes
+        pads (int): number of bytes that need to be added
+        sig (int): the signed bit
+
+    Returns:
+        bytes with the correct length and sign
     """
 
     length = len(bytes)
@@ -451,10 +685,8 @@ def getSigned(bytes):
         pads = 8 - length
 
         sig = bytes[length-1]
-        #print (sig)
 
         sig = sig >> 7
-        #print (sig)
 
         # if positive pad with 00
         if sig == 0:
@@ -467,16 +699,55 @@ def getSigned(bytes):
         return unpack("<q", bytes)[0]
 
 
+def check_flags(flags):
+    """
+    Determine which flags the attribute has given the flag field.
+    
+    Attributes:
+        strings (string): string of the attribute's flags
+
+    Returns:
+        string of the flags found from the given flag field
+    """
+
+    strings = ""
+
+    # check for 0x0001, 0x0002, 0x0004 flags
+    if flags & 0b0001 == 1: strings += "Read Only "
+    if flags & 0b0010 == 2: strings += "Hidden "
+    if flags & 0b0100 == 4: strings += "System "
+
+    # check for 0x0020, 0x0040, 0x0080 flags
+    if flags & 0b00100000 == 32: strings += "Archive "
+    if flags & 0b01000000 == 64: strings += "Device "
+    if flags & 0b10000000 == 128: strings += "#Normal "
+
+    # check for 0x0100, 0x0200, 0x0400, 0x0800 flags
+    if flags & 0b000100000000 == 256: strings += "Temporary "
+    if flags & 0b001000000000 == 512: strings += "Sparse file "
+    if flags & 0b010000000000 == 1024: strings += "Reparse point "
+    if flags & 0b100000000000 == 2048: strings += "Compressed "
+
+    # check for 0x1000, 0x2000, 0x4000 flags
+    if flags & 0b0001000000000000 == 4096: strings += "Offline "
+    if flags & 0b0010000000000000 == 8192:
+        strings += "Content is not being indexed for faster searches "
+    if flags & 0b0100000000000000 == 16384: strings += "Encrypted "
+
+    return strings
+
+#--------------------------------
+
 def usage():
     """ Print usage string and exit() """
-    print("Usage:\n%s <image.dmg>\n" % sys.argv[0])
+    print("Usage:\n%s <entry to parse> <image.dmg>\n" % sys.argv[0])
     sys.exit()
 
 
 def main():
     """ Simple arg check and runs """
-    if len(sys.argv) == 2:
-        istat = NTFS(sys.argv[1])
+    if len(sys.argv) == 3:
+        istat = NTFS(sys.argv[1], sys.argv[2])
         istat.run()
     else:
         usage()

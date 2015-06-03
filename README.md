@@ -19,3 +19,21 @@ All homeworks written in Python 3.2
 ####Homework 3: EXIF
 
   Parses EXIF tags from a JPEG file.
+
+  To run `/usr/bin/python3.2 exif.py <filename>`
+
+####Homework 4: FAT
+
+  Parses a FAT file system.
+
+  To run `/usr/bin/python3.2 fstat.py <offset param> <image.dmg>`
+
+####Homework 5: NTFS
+
+  Parses an NTFS file system.
+
+  To run `/usr/bin/python hw5.py <entry to parse> <image.dmg>`
+
+####Homework 6: Zebra
+
+  Had to use forensics techniques and sleuth kit to find evidence that the user of the example drive case.dd was looking at pictures of zebras.

@@ -1,12 +1,12 @@
 #!/usr/vin/env python3
 
-"""
-Sam Kolovson
-CS365: Digital Forensics
-Professor Brian Levine
-Homework 5: NTFS
-April 2015
-"""
+# ---------------------------
+# Sam Kolovson
+# CS365: Digital Forensics
+# Professor Brian Levine
+# Homework 5: NTFS
+# April 2015
+# ---------------------------
 
 import sys
 from struct import unpack
@@ -14,7 +14,10 @@ import datetime
 
 class NTFS(object):
     """
-    Parses the $MFT and an arbitrary MFT entry of an NTFS image
+    Parses the $MFT and an arbitrary MFT entry of an NTFS image.
+
+    p.s. If I had more time I would refactor and reorganize this more than I did.
+    p.p.s. I understand NTFS now.
 
     Variables:
         _dmg (string): name of the image to be parsed
@@ -132,6 +135,7 @@ class NTFS(object):
             entry = MFT_entry(self._fd.read(1024))
             entry.run()
         except:
+            # the entry is out of the runlists bounds
             print ("The file system does not contain the selected entry...")
             print ("Error:", sys.exc_info()[0])
 
@@ -216,8 +220,8 @@ class MFT_entry(object):
         print ("MFT Entry Header Values:")
         print ("Sequence: %d" % seq)
         print ("$LogFile Sequence Number: %d" % lsn)
-        print ("Allocated/Unallocated File")
-        print ("Directory")
+        if allocated_size > 0: print ("Allocated File")
+        else: print ("Unallocated File")
         print ("")
         print ("Used size: %d bytes" % self._used_size)
         print ("Allocated size: %d bytes" % allocated_size)
@@ -248,33 +252,45 @@ class MFT_entry(object):
         num = unpack("<H", self._entry[6:8])[0]
         print ("Number of entries in the fix up array: %d" % num)
 
+        # get the fixup signature
         signature = ''.join('{:02x}'.format(b) for b in reversed(self._entry[offset:offset+2]))
         print ("Fixup sig: 0x" + signature)
 
+        # read in the fixup array
         fixup_array = []
         for i in range (0, num-1):
             fixup_array.append(self._entry[offset+2+i*2: offset+4+i*2])
-            #string += "0x" + ''.join('{:02x}'.format(b) for b in reversed(fixup_array[i])) + ", "
 
-        temp_entry = []
+        # overwrite proper values
+        temp_entry = []  # cannot overwrite bytes without making a new array
         current_offset = 0
+
         for i in range (0, num-1):
             sector_offset = 510*(i+1) + i*2
+
             bytes = "0x" + ''.join('{:02x}'.format(b) for b in 
                 reversed(self._entry[sector_offset:sector_offset+2]))
             print ("Bytes %d/%d %s;" % (sector_offset, sector_offset+1, bytes), end=" ")
 
-            # over write
             print ("Overwriting 0x%s into bytes %d/%d" % 
                 (''.join('{:02x}'.format(b) for b in reversed(fixup_array[i])), 
                     sector_offset, sector_offset+1))
+
+            # add sector up until last two bytes
             temp_entry.extend(self._entry[current_offset:sector_offset])
+
+            # add fixup value
             temp_entry.extend(fixup_array[i])
+
+            # replace value in the fixup array with the one on disk
             fixup_array[i] = self._entry[sector_offset:sector_offset+2]
+
+            # update offset
             current_offset = sector_offset+2
 
+        # create temp_entry as bytearray
         temp_entry = bytearray(temp_entry)
-        self._entry = temp_entry
+        self._entry = temp_entry # overwrite the bytes in memory
 
         print ("")
 
@@ -291,9 +307,11 @@ class MFT_entry(object):
             file_name (FILE_NAME): the $FILE_NAME attribute
             nr_flag (int): zero if attribute is resident, 1 if non-resident
         """
-        #print ("Next attr id %d" % self._next_attrID)
+
         byte_offset = self._first_attr
         attr_count = 0
+
+        # while still within the entry and the number assigned attributes
         while (byte_offset+16 < self._used_size and attr_count < self._next_attrID):
             print ("Parsing next attribute: ((byte_offset=(%d+16) < used_size=%d) and (attr_count=%d < next_attribute=%d)"
                 % (byte_offset, self._used_size, attr_count, self._next_attrID))
@@ -349,16 +367,21 @@ class MFT_entry(object):
         """
         # get attribute type identifier 0-3
         attr_type = unpack("<L", attr[0:4])[0]
+        
         # get non-resident flag 8-8
         nr_flag = unpack("<B", attr[8:9])[0]
         if nr_flag == 0: resident = "Resident"
         else: resident = "Non-resident" 
+        
         # get length of name 9-9
         name_length = unpack("<B", attr[9:10])[0]
+        
         # get offset to name 10-11
         name_offset = unpack("<H", attr[10:12])[0]
+        
         # get flags 12-13
         flags = unpack("<H", attr[12:14])[0]
+        
         # get attribute identifier 14-15
         attr_id = unpack("<H", attr[14:16])[0]
 
@@ -400,6 +423,7 @@ class MFT_entry(object):
             end_vcn (int): ending virtual cluster number
             offset_to_rl (int): offset to runlist
         """
+
         start_vcn = unpack("<2L", attr[16:24])[0]
         end_vcn = unpack("<2L", attr[24:32])[0]
         print ("VCN: %d - %d" % (start_vcn, end_vcn))
@@ -512,27 +536,38 @@ class STD_INFO(object):
 
         # get creation time 0-7
         self._file_creation = convert_time(self._content[0:8])
+
         # get file altered time 8-15
         self._file_altered = convert_time(self._content[8:16])
+
         # get MFT altered time 16-23
         self._mft_altered = convert_time(self._content[16:24])
+
         # get file accessed time 24-31
         self._file_accessed = convert_time(self._content[24:32])
+
         # get flags 32-35
         self._flags = unpack("<L", self._content[32:36])[0]
         self._flags = check_flags(self._flags)
+
         # get maximum number of versions 36-39
         self._num_versions = unpack("<L", self._content[36:40])[0]
+        
         # get version number 40-43
         self._version = unpack("<L", self._content[40:44])[0]
+        
         # get class id 44-47
         self._class_id = unpack("<L", self._content[44:48])[0]
+        
         # get owner id 48-51
         self._owner_id = unpack("<L", self._content[48:52])[0]
+        
         # get security id 52-55
         self._security_id = unpack("<L", self._content[52:56])[0]
+        
         # get quota charged 56-63
         self._quota = unpack("<2L", self._content[56:64])[0]
+        
         # update sequence number 64-71
         self._usn = unpack("<2L", self._content[64:72])[0]
 
@@ -596,27 +631,38 @@ class FILE_NAME(object):
 
         # get file reference of parent directory 0-7
         self._parent_dir = unpack("<2L", self._content[0:8])[0]
+
         # get file creation time 8-15
         self._file_creation = convert_time(self._content[8:16])
+
         # get file modification time 16-23
         self._file_modification = convert_time(self._content[16:24])
+
         # get MFT modification time 24-31
         self._mft_modification = convert_time(self._content[24:32])
+
         # get file access time 32-39
         self._file_access = convert_time(self._content[32:40])
+
         # get allocated size of the file 40-47
         self._alloc_size = unpack("<2L", self._content[40:48])[0]
+
         # get real size of the file 48-55
         self._real_size = unpack("<2L", self._content[48:56])[0]
+
         # get flags 56-59
         self._flags = unpack("<L", self._content[56:60])[0]
         self._flags = check_flags(self._flags)
+
         # get reparse value 60-63
         self._reparse = unpack("<L", self._content[60:64])[0]
+
         # get length of name 64-64
         self._name_length = unpack("<B", self._content[64:65])[0]
+
         # get namespace 65-65
         self._namespace = unpack("<B", self._content[65:66])[0]
+
         # get name 66+
         self._name = self._content[66:].decode("utf-8")
 
